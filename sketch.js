@@ -1,32 +1,31 @@
-// 비디오 및 얼굴 인식 관련 변수 선언 / Declare video and face detection variables
 let video;
 let faceapi;
-let detections = [];
-let particles = []; // 입자 배열 / Array for particles
+let detections = []; // Variable for face detection
+let particles = []; // Array for particles
 
 function setup() {
-  // 캔버스 생성 / Create the canvas
+  // Create canvas
   createCanvas(640, 480);
 
-  // 카메라 연결 / Connect webcam
+  // Connect webcam
   video = createCapture(VIDEO);
   video.size(width, height);
-  video.hide(); // HTML 요소로 영상이 보이지 않게 숨김 / Hide the default video element
+  video.hide(); // Hide the default HTML video element
 
-  // [4] 얼굴 감정 분석 모델 옵션 설정 / Set options for face expression detection
+  // Options for face expression detection
   const options = {
-    withLandmarks: true, // 얼굴 포인트 추출 / Extract facial landmarks
-    withExpressions: false, // 감정 분석 활성화 / Enable emotion prediction
-    withDescriptors: false // 얼굴 인식 ID 활성화 / Disable descriptor mode
+    withLandmarks: true, // Extract facial landmarks
+    withExpressions: false, // Enable emotion prediction
+    withDescriptors: false // Disable descriptor mode
   };
 
-  // [5] faceapi 모델 로드 / Load the faceApi model
+  // Load the faceApi model
   faceapi = ml5.faceApi(video, options, modelReady);
 }
 
 function modelReady() {
   console.log('😎 faceApi model loaded!');
-  faceapi.detect(gotResults); // 최초 탐지 호출 / Initial detection call
+  faceapi.detect(gotResults); // Initial detection call
 }
 
 function gotResults(err, result) {
@@ -35,26 +34,38 @@ function gotResults(err, result) {
     return;
   }
 
-  detections = result; // 결과 저장 / Store detection results
-  faceapi.detect(gotResults); // 재탐지 반복 / Continuous detection
-}
+  detections = result; // Store detection results
+  faceapi.detect(gotResults); // Loop detection
 
-function draw() {
-  // 카메라 영상을 캔버스에 출력 / Draw the video onto the canvas
-  image(video, 0, 0, width, height);
-
-  // 얼굴 탐지 성공 시 / If face detected
+  // If face detected
   if (detections.length > 0) {
     const mouth = detections[0].parts.mouth;
 
-    // 입 중심 좌표 계산 / Calculate mouth center
-    let center = getMouthCenter(mouth);
+    let center = getMouthCenter(mouth); // Calculate mouth center
+    let openness = getNormalizedMouthOpenness(mouth); // Calculate openness ratio
 
-    // 입자 추가 / Add particle
-    particles.push(new Particle(center.x, center.y));
+    // Skip particle generation when mouth is nearly closed
+    if (openness < 0.31) return;
+
+    let size = map(openness, 0.18, 0.35, 4, 12); // Map openness range (0.18~0.35) → size range (4~12)
+    let speed = map(openness, 0.18, 0.35, 1, 4); // Map openness range (0.18~0.35) → speed range (1~4)
+    let count = floor(map(openness, 0.18, 0.35, 1, 5)); // Map openness range (0.18~0.35) → number of particles created per frame (1~5)
+
+    for (let i = 0; i < count; i++) {
+      particles.push(new Particle(center.x, center.y, size, speed));
+    }
+
+    // Limit total particle count (to prevent particle overload & performance drop)
+    if (particles.length > 300) {
+      particles.splice(0, particles.length - 300);
+    }
   }
+}
 
-  // 입자 업데이트 및 출력 / Update and draw particles
+function draw() {
+  // Draw the video onto canvas
+  image(video, 0, 0, width, height);
+
   for (let i = particles.length - 1; i >= 0; i--) {
     particles[i].update();
     particles[i].display();
@@ -62,9 +73,19 @@ function draw() {
       particles.splice(i, 1);
     }
   }
+
+  // If face detected
+  if (detections.length > 0) {
+    const mouth = detections[0].parts.mouth;
+    let center = getMouthCenter(mouth); // Calculate mouth center
+    let openness = getNormalizedMouthOpenness(mouth); // Calculate openness ratio
+
+    text(`Openness Ratio: ${nf(openness, 1, 3)}`, 10, height - 10);
+    text(`FPS: ${floor(frameRate())}`, width - 60, height - 10);
+  }
 }
 
-// 🧠 입 좌표 평균으로 중심 구하기 / Get center of mouth
+// Get center of mouth
 function getMouthCenter(mouthPoints) {
   let xSum = 0,
     ySum = 0;
@@ -78,19 +99,39 @@ function getMouthCenter(mouthPoints) {
   };
 }
 
-// 💨 입자 클래스 / Particle class
+// Calculate mouth openness ratio
+function getNormalizedMouthOpenness(mouthPoints) {
+  const topLip = mouthPoints[13];
+  const bottomLip = mouthPoints[17];
+  const leftCorner = mouthPoints[0];
+  const rightCorner = mouthPoints[6];
+
+  if (topLip && bottomLip && leftCorner && rightCorner) {
+    const vertical = dist(topLip._x, topLip._y, bottomLip._x, bottomLip._y);
+    const horizontal = dist(
+      leftCorner._x,
+      leftCorner._y,
+      rightCorner._x,
+      rightCorner._y
+    );
+    return vertical / horizontal;
+  } else {
+    return 0; // fallback if data is missing
+  }
+}
+
 class Particle {
-  constructor(x, y) {
+  constructor(x, y, size, speed) {
     this.pos = createVector(x, y);
-    this.vel = p5.Vector.random2D().mult(random(1, 3)); // 랜덤 방향 / random direction
-    this.lifespan = 255; // 생명력 / lifespan
-    this.size = random(5, 10);
-    this.color = color(255, 150, 0, this.lifespan); // 주황빛 입자 / orange-ish particle
+    this.vel = p5.Vector.random2D().mult(random(1, 3)); // random direction
+    this.lifespan = 255;
+    this.size = size;
+    this.color = color(255, 150, 0, this.lifespan); // initial color with alpha
   }
 
   update() {
     this.pos.add(this.vel);
-    this.lifespan -= 4;
+    this.lifespan -= 5;
     this.color.setAlpha(this.lifespan);
   }
 
