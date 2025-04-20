@@ -12,12 +12,14 @@
       <div id="canvas-container"></div>
     </main>
 
-    <!-- import libs using CDN -->
+    <!-- import libs-->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/ml5@0.6.0/dist/ml5.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@latest/build/three.min.js"></script>
 
     <!-- p5.js -->
-    <script src="sketch.js"></script>
+    <script type="module" src="sketch.js"></script>
   </body>
 </html>
