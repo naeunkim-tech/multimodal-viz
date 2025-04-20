@@ -3,17 +3,49 @@ import Particle from './particle.js';
 
 let video;
 let particles = []; // Array for particles
+let sizeSlider,
+  speedSlider,
+  colorPicker,
+  shapeSlider,
+  concavitySlider,
+  countSlider,
+  lifespanSlider;
 
 // Lifecycle function: Automatically called once when the page loads
 function setup() {
   // Create canvas
-  createCanvas(640, 480);
+  const canvas = createCanvas(640, 480);
+  canvas.parent('canvas-container');
 
   // Connect webcam
   video = createCapture(VIDEO); // Start capturing video from webcam
   video.size(width, height); // Match video dimensions to canvas size
   video.hide(); // Hide the default HTML video element
   setupFaceMesh(video.elt);
+
+  // Particle control UI
+  const uiContainer = createDiv().id('ui-container');
+
+  sizeSlider = createSlider(1, 20, 8, 1).parent(uiContainer);
+  createSpan(' Size').parent(uiContainer);
+
+  speedSlider = createSlider(0.1, 10, 3, 0.1).parent(uiContainer);
+  createSpan(' Speed').parent(uiContainer);
+
+  colorPicker = createColorPicker('#ff9600').parent(uiContainer);
+  createSpan(' Color').parent(uiContainer);
+
+  shapeSlider = createSlider(0, 10, 0, 1).parent(uiContainer);
+  createSpan(' Shape (sides)').parent(uiContainer);
+
+  concavitySlider = createSlider(0, 1, 0, 0.05).parent(uiContainer);
+  createSpan(' Concavity (0=smooth, 1=sharp)').parent(uiContainer);
+
+  countSlider = createSlider(1, 20, 5, 1).parent(uiContainer);
+  createSpan(' Count (particles per frame)').parent(uiContainer);
+
+  lifespanSlider = createSlider(1, 10, 4, 1).parent(uiContainer);
+  createSpan(' Lifespan decay (higher = faster)').parent(uiContainer);
 }
 
 // Lifecycle function: Automatically repeats every frame (default 60 times per second)
@@ -22,19 +54,20 @@ function draw() {
   image(video, 0, 0, width, height);
 
   if (openness > 0.03) {
-    let size = map(openness, 0.01, 0.05, 4, 12);
-    let speed = map(openness, 0.01, 0.05, 1, 4);
-    let count = floor(map(openness, 0.01, 0.05, 1, 5));
+    const count = countSlider.value();
+
+    const settings = {
+      size: sizeSlider.value(),
+      speed: speedSlider.value(),
+      color: colorPicker.color(),
+      shapeSides: shapeSlider.value(),
+      concavity: concavitySlider.value(),
+      lifespanDecay: lifespanSlider.value()
+    };
 
     for (let i = 0; i < count; i++) {
       particles.push(
-        new Particle(
-          center.x * width,
-          center.y * height,
-          size,
-          speed,
-          direction
-        )
+        new Particle(center.x * width, center.y * height, direction, settings)
       );
     }
   }
@@ -50,16 +83,6 @@ function draw() {
       particles.splice(i, 1);
     }
   }
-
-  // // If face detected
-  // if (detections.length > 0) {
-  //   const mouth = detections[0].parts.mouth;
-  //   let center = getMouthCenter(mouth); // Calculate mouth center
-  //   let openness = getNormalizedMouthOpenness(mouth); // Calculate openness ratio
-
-  //   text(`Openness Ratio: ${nf(openness, 1, 3)}`, 10, height - 10);
-  //   text(`FPS: ${floor(frameRate())}`, width - 60, height - 10);
-  // }
 }
 
 window.setup = setup;
